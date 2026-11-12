@@ -1,55 +1,20 @@
-# Yidun Slider Crypto
+易盾滑块验证分析项目使用 Python 分析易盾滑块验证的自定义加密、图像匹配和轨迹编码。代码按完整请求流程组织，各个步骤可以单独查看和调试。
 
-A Python look at Yidun's slider puzzle, from its custom encryption to image matching and motion encoding. The code follows the complete request flow and keeps the individual pieces easy to inspect.
+分析内容包括自定义字节编码、两套 Base64 字符表、CRC32 计算、类似 PKCS7 的填充方式、IV 生成、类似 CBC 的自定义加密流程以及 `cb` 参数生成。脚本还使用 OpenCV 匹配滑块缺口，并生成拖动轨迹、编码请求数据。
 
-## What it covers
+代码中名为 `aes` 的函数并不是标准 AES 实现。它使用自定义 S 盒、固定种子和一组轮密钥操作。代码先将输入转换为字节并追加 CRC32 值，再按 64 字节分组填充数据。随后生成并扩展 IV，对每个分组依次执行轮密钥操作、XOR、加法和 S 盒替换，最后使用私有 Base64 字符表编码原始 IV 和加密后的字节。
 
-- Custom byte encoding and two Base64 alphabets
-- CRC32 generation and PKCS7-style padding
-- IV generation and the custom CBC-like encryption routine
-- `cb` parameter generation
-- Slider image matching with OpenCV
-- Motion generation and request payload encoding
+主程序的实际求解过程由 `solve_captcha` 调用 `get_captcha` 开始，通过 `get` 获取背景图、滑块图和 token。随后下载图片，使用多种 OpenCV 匹配方法估算缺口位置，根据缺口位置生成拖动轨迹并编码提交字段，最后调用 `check_captcha`，将轨迹数据提交到 `check`。`get_config` 对应 `getconf` 配置请求，但当前 `solve_captcha` 和 `main` 均未调用它，因此不属于实际求解流程。
 
-## Encryption notes
+图像匹配综合使用带掩码的模板匹配、Canny 边缘、Sobel 梯度和相关性计算，并剔除与中位数偏差过大的结果。轨迹分为加速、快速接近、减速调整和最终对齐四段，并加入轻微的纵向变化，避免所有点排列成一条直线。提交字段包含采样后的轨迹点、最终位置、时间戳和轨迹点数量。
 
-The routine named `aes` is not a standard AES implementation. It uses a custom S-box, a fixed seed, and a sequence of round-key operations.
+`before-analysis.js` 是原始第三方参考快照，保持原样；`after-analysis.js` 是整理后的版本，便于对照分析。
 
-The main flow is:
-
-1. Convert the input to bytes.
-2. Append a CRC32 value.
-3. Pad the data to 64-byte blocks.
-4. Generate and expand the IV.
-5. Transform each block with the round-key operations, XOR, addition, and S-box substitutions.
-6. Encode the raw IV and encrypted bytes with the private Base64 alphabet.
-
-## Request flow
-
-The solver follows four stages:
-
-1. `getconf` retrieves the puzzle configuration.
-2. `get` retrieves the background, puzzle piece, and token.
-3. Several OpenCV matching methods estimate the gap position.
-4. The motion data is generated, encoded, and sent to `check`.
-
-Image matching combines masked template matching, Canny edges, Sobel gradients, and correlation. Results that sit too far from the median are discarded.
-
-## Motion data
-
-Motion is generated in four parts: acceleration, a faster approach, a slower adjustment, and final alignment. Small vertical variations keep the points from forming a perfectly straight line.
-
-The submitted fields contain sampled motion points, the final position, timestamps, and the number of points.
-
-## JavaScript references
-
-`before-analysis.js` keeps the original reference snapshot, while `after-analysis.js` provides the processed version for comparison.
-
-## Setup
+安装依赖并运行程序可使用以下命令：
 
 ```bash
 pip install requests opencv-python numpy pillow
 python slider_crypto.py
 ```
 
-For security research and authorized testing only.
+程序会访问易盾滑块演示页面，输出缺口位置、轨迹点数量、提交结果和验证字符串。本项目仅供安全研究和已获授权的测试使用。

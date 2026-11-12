@@ -320,7 +320,7 @@ function splitArray(arr, n) {
         }
         return result;
     }
-    throw new TypeError('Invalid attempt to destructure non-iterable instance');
+    throw new TypeError('无法解构不可迭代的对象');
 }
 
 var BASE64_ALPHABET = [

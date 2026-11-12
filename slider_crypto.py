@@ -1,4 +1,4 @@
-"""Explore Yidun's slider encryption, image matching, and motion encoding."""
+"""分析易盾滑块验证的自定义加密、图像匹配和轨迹编码。"""
 
 import json
 import math
@@ -65,7 +65,7 @@ CRC32_TABLE = [
 
 
 def to_byte(value):
-    """Clamp an integer to a signed byte."""
+    """将整数限制在有符号字节范围内。"""
     value &= 0xFF
     return value - 256 if value > 127 else value
 
@@ -79,12 +79,12 @@ def hexs_to_bytes(value):
 
 
 def int_to_bytes(value):
-    """Return a 32-bit integer as four signed bytes."""
+    """将 32 位整数转换为四个有符号字节。"""
     return [to_byte(value >> shift) for shift in (24, 16, 8, 0)]
 
 
 def string_to_bytes(value):
-    """Match the JavaScript URI encoding behavior."""
+    """按照 JavaScript 的 URI 编码行为转换字符串。"""
     encoded = urllib.parse.quote(value, safe="")
     result = []
     index = 0
@@ -233,7 +233,7 @@ def shifts(data, key):
 
 
 def apply_round_key(block):
-    """Apply the custom sequence of round-key operations."""
+    """依次执行自定义轮密钥操作。"""
     round_key = __ROUND_KEY__
     index = 0
     while index < len(round_key):
@@ -304,7 +304,7 @@ def generate_iv():
 
 
 def aes(input_string):
-    """Run the custom CBC-like encryption used by the slider."""
+    """执行滑块验证使用的类 CBC 自定义加密。"""
     data_bytes = string_to_bytes(input_string)
     iv, raw_iv = generate_iv()
     combined = data_bytes + string_to_bytes(gen_crc32(data_bytes))
@@ -359,7 +359,7 @@ def encode_trace_point(token, x, y, elapsed, trust):
 
 
 def build_slider_data(token, trace_points: List[Tuple[float, float, int, int]], slider_left, slider_width, mouse_down_counts=1):
-    """Encode the fields expected by the slider check request."""
+    """编码滑块 check 请求所需的字段。"""
     trace_data = [xor_encode(token, f"{round(point[0])},{round(point[1])},{point[2]},{point[3]}") for point in trace_points]
     atom_trace_data = unique_2d_array(trace_points, 2)
     timestamps = sorted(set(point[2] for point in atom_trace_data))
@@ -374,7 +374,7 @@ def build_slider_data(token, trace_points: List[Tuple[float, float, int, int]], 
 
 
 def generate_track(distance, duration_ms=800):
-    """Create a varied drag path with approach and alignment stages."""
+    """生成包含接近、减速和对齐阶段的拖动轨迹。"""
     points = []
     current = 0.0
     elapsed = 0
@@ -412,7 +412,7 @@ def generate_track(distance, duration_ms=800):
 
 
 def url_to_cv2(url):
-    """Download an image and convert it to an OpenCV array."""
+    """下载图片并转换为 OpenCV 数组。"""
     response = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
     response.raise_for_status()
     image = Image.open(BytesIO(response.content))
@@ -422,7 +422,7 @@ def url_to_cv2(url):
 
 
 def find_gap_position(background, front):
-    """Combine several matching methods and reject outlying positions."""
+    """综合多种匹配方法，并剔除偏离过大的位置。"""
     front_rgb = front[:, :, :3]
     alpha = front[:, :, 3]
     _, mask = cv2.threshold(alpha, 50, 255, cv2.THRESH_BINARY)
@@ -470,7 +470,7 @@ def find_gap_position(background, front):
 
 
 def find_gap_position_v1(background, front):
-    """Keep the original three-method matcher available for comparison."""
+    """保留原始的三种匹配方法，便于对照。"""
     front_rgb = front[:, :, :3]
     alpha = front[:, :, 3]
     _, mask = cv2.threshold(alpha, 50, 255, cv2.THRESH_BINARY)
@@ -543,58 +543,58 @@ def check_captcha(session, token, slider_data, zone_id="CN31", ir_token=""):
 
 
 def solve_captcha(session, max_retries=10) -> Optional[str]:
-    """Run the complete puzzle flow and return a validation string on success."""
+    """执行完整验证流程，成功时返回验证字符串。"""
     for attempt in range(max_retries):
-        print(f"\nAttempt {attempt + 1}/{max_retries}")
-        print("[1/4] Requesting puzzle images...")
+        print(f"\n第 {attempt + 1}/{max_retries} 次尝试")
+        print("[1/4] 正在请求验证码图片...")
         captcha_data = get_captcha(session)
         if captcha_data.get("error") != 0:
-            print(f"Puzzle request failed: {captcha_data}")
+            print(f"验证码请求失败：{captcha_data}")
             continue
 
         data = captcha_data["data"]
         token = data["token"]
-        print(f"Token: {token[:20]}...")
-        print(f"Type: {data.get('type', 2)}")
-        print("[2/4] Estimating the gap position...")
+        print(f"Token：{token[:20]}...")
+        print(f"类型：{data.get('type', 2)}")
+        print("[2/4] 正在估算缺口位置...")
         try:
             background = url_to_cv2(data["bg"][0])
             front = url_to_cv2(data["front"][0])
             gap_x = find_gap_position(background, front)
-            print(f"Background: {background.shape}; piece: {front.shape}")
-            print(f"Gap position: {gap_x:.1f}px")
+            print(f"背景图尺寸：{background.shape}；滑块图尺寸：{front.shape}")
+            print(f"缺口位置：{gap_x:.1f} 像素")
         except Exception as error:
-            print(f"Image processing failed: {error}")
+            print(f"图片处理失败：{error}")
             continue
 
-        print("[3/4] Building motion data...")
+        print("[3/4] 正在生成轨迹数据...")
         control_width = 855
         distance = gap_x * control_width / background.shape[1] + random.uniform(-1, 2)
         trace_points = generate_track(distance, duration_ms=random.randint(600, 1200))
         slider_data = build_slider_data(token, trace_points, distance, control_width)
-        print(f"Distance: {distance:.1f}px; points: {len(trace_points)}")
+        print(f"拖动距离：{distance:.1f} 像素；轨迹点数：{len(trace_points)}")
 
-        print("[4/4] Submitting the puzzle...")
+        print("[4/4] 正在提交验证...")
         result = check_captcha(session, token, slider_data, data.get("zoneId", "CN31"))
-        print(f"Response: error={result.get('error')}; result={result.get('data', {}).get('result')}")
+        print(f"响应：error={result.get('error')}；result={result.get('data', {}).get('result')}")
         if result.get("error") == 0 and result.get("data", {}).get("result"):
             validate = result.get("data", {}).get("validate", "")
-            print("Puzzle completed.")
-            print(f"Validation: {validate}")
+            print("验证通过。")
+            print(f"验证字符串：{validate}")
             return validate
-        print("The response was not accepted; trying again.")
+        print("响应未通过验证，准备重试。")
     return None
 
 
 def main():
-    print("Yidun slider demo: https://dun.163.com/trial/jigsaw-wap")
+    print("易盾滑块演示：https://dun.163.com/trial/jigsaw-wap")
     session = requests.Session()
     session.headers.update(HEADERS)
     validate = solve_captcha(session, max_retries=15)
     if validate:
-        print(f"Done. Validation: {validate}")
+        print(f"完成。验证字符串：{validate}")
     else:
-        print("All attempts failed.")
+        print("所有尝试均未通过。")
 
 
 if __name__ == "__main__":
